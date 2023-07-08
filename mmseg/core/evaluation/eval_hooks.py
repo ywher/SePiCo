@@ -23,7 +23,7 @@ class EvalHook(_EvalHook):
 
     greater_keys = ['mIoU', 'mAcc', 'aAcc']
 
-    def __init__(self, *args, by_epoch=False, efficient_test=False, **kwargs):
+    def __init__(self, *args, by_epoch=False, efficient_test=False, save_best='mIoU', **kwargs):
         super().__init__(*args, by_epoch=by_epoch, **kwargs)
         self.efficient_test = efficient_test
 
@@ -59,7 +59,7 @@ class DistEvalHook(_DistEvalHook):
 
     greater_keys = ['mIoU', 'mAcc', 'aAcc']
 
-    def __init__(self, *args, by_epoch=False, efficient_test=False, **kwargs):
+    def __init__(self, *args, by_epoch=False, efficient_test=False, save_best='mIoU', **kwargs):
         super().__init__(*args, by_epoch=by_epoch, **kwargs)
         self.efficient_test = efficient_test
 

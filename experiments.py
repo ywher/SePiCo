@@ -164,7 +164,7 @@ def generate_experiment_cfgs(id):
         cfg['runner'] = dict(type='IterBasedRunner', max_iters=iters)
         cfg['checkpoint_config'] = dict(
             by_epoch=False, interval=iters, max_keep_ckpts=1)
-        cfg['evaluation'] = dict(interval=1000, metric='mIoU')
+        cfg['evaluation'] = dict(interval=iters // 20, metric='mIoU')
 
         # Construct uda name
         uda_mod = uda
