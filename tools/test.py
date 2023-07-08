@@ -37,6 +37,10 @@ def parse_args():
         '--aug-test', action='store_true', help='Use Flip and Multi scale aug')
     parser.add_argument('--out', help='output result file in pickle format')
     parser.add_argument(
+        '--test-set',
+        action='store_true',
+        help='Run inference on the test set')
+    parser.add_argument(
         '--format-only',
         action='store_true',
         help='Format the output results without perform evaluation. It is'
@@ -82,6 +86,7 @@ def parse_args():
         help='Whether to use palette in format.'
     )
     parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument('--save_logits', action='store_true', help='save logits')
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -165,7 +170,7 @@ def main():
     if not distributed:
         model = MMDataParallel(model, device_ids=[0])
         outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
-                                  efficient_test, args.opacity)
+                                  efficient_test, args.opacity, args.save_logits)
     else:
         model = MMDistributedDataParallel(
             model.cuda(),

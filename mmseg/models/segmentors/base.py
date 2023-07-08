@@ -9,6 +9,9 @@ import numpy as np
 import torch
 import torch.distributed as dist
 from mmcv.runner import BaseModule, auto_fp16
+# import sys
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 class BaseSegmentor(BaseModule, metaclass=ABCMeta):
@@ -60,7 +63,7 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
         """Placeholder for augmentation test."""
         pass
 
-    def forward_test(self, imgs, img_metas, **kwargs):
+    def forward_test(self, imgs, img_metas, return_logits, **kwargs):
         """
         Args:
             imgs (List[Tensor]): the outer list indicates test-time
@@ -90,12 +93,12 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
             assert all(shape == pad_shapes[0] for shape in pad_shapes)
 
         if num_augs == 1:
-            return self.simple_test(imgs[0], img_metas[0], **kwargs)
+            return self.simple_test(imgs[0], img_metas[0], return_logits, **kwargs)
         else:
             return self.aug_test(imgs, img_metas, **kwargs)
 
     @auto_fp16(apply_to=('img', ))
-    def forward(self, img, img_metas, return_loss=True, **kwargs):
+    def forward(self, img, img_metas, return_loss=True, return_logits=True, **kwargs):
         """Calls either :func:`forward_train` or :func:`forward_test` depending
         on whether ``return_loss`` is ``True``.
 
@@ -108,7 +111,7 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
         if return_loss:
             return self.forward_train(img, img_metas, **kwargs)
         else:
-            return self.forward_test(img, img_metas, **kwargs)
+            return self.forward_test(img, img_metas, return_logits,**kwargs)
 
     def train_step(self, data_batch, optimizer, **kwargs):
         """The iteration step during training.
@@ -200,7 +203,8 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
                     show=False,
                     wait_time=0,
                     out_file=None,
-                    opacity=0.5):
+                    opacity=0.5,
+                    save_logits=False):
         """Draw `result` over `img`.
 
         Args:
@@ -225,7 +229,14 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
         """
         img = mmcv.imread(img)
         img = img.copy()
-        seg = result[0]
+        # result change from seg_pred (list) to [seg_pred, seg_logit]
+        seg = result[0][0]
+        if save_logits:
+            seg_logit = result[1][0]  # [1, C, H, W] -> [C, H, W], after softmax, in cpu numpy
+            seg_confidence = np.max(seg_logit, axis=0)  # [H, W]
+            # calculate entropy and normalize to [0, 1]
+            seg_entropy = np.sum(-seg_logit * np.log(seg_logit), axis=0) / np.log(seg_logit.shape[0])
+
         if palette is None:
             if self.PALETTE is None:
                 palette = np.random.randint(
@@ -253,6 +264,14 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
             mmcv.imshow(img, win_name, wait_time)
         if out_file is not None:
             mmcv.imwrite(img, out_file)
+            mmcv.imwrite(seg, out_file.replace('.png', 'trainID.png'))
+            if save_logits:
+                np.save(out_file.replace('.png', '_confi.npy'), seg_confidence.astype(np.float16))
+                np.save(out_file.replace('.png', '_entro.npy'), seg_entropy.astype(np.float16))
+                del seg_confidence
+                del seg_entropy
+            del img
+            del seg
 
         if not (show or out_file):
             warnings.warn('show==False and out_file is not specified, only '

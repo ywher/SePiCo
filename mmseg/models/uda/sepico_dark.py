@@ -143,6 +143,17 @@ class SePiCoDark(UDADecorator):
         ema_cfg = deepcopy(cfg['model'])
         self.ema_model = build_segmentor(ema_cfg)
 
+        ###nwp
+        self.nwp = cfg['nwp']
+        self.nwp_alpha = cfg['nwp_alpha']
+        self.nwp_rho = cfg['nwp_rho']
+        self.nwp_trigger = 0
+        
+        ###target_pseudo
+        self.target_pseudo = cfg['target_pseudo']
+        self.target_pseudo_weight = cfg['target_pseudo_weight']
+        self.target_pseudo_disable_iter = cfg['target_pseudo_disable_iter'] * self.max_iters
+
     def get_ema_model(self):
         return get_module(self.ema_model)
 
@@ -199,9 +210,43 @@ class SePiCoDark(UDADecorator):
                 DDP, it means the batch size on each GPU), which is used for
                 averaging the logs.
         """
-
+        weight = 1
+        if self.nwp:
+            #gpu 1
+            if self.nwp_trigger: #trigger = 1
+                # print('begin nwp')
+                weight = self.nwp_alpha * 2
+                with torch.no_grad():
+                    noise = []
+                    for mp in self.get_model().parameters(): #mp:model.parameter
+                        if len(mp.shape) > 1: #w
+                            sh = mp.shape #[64,3,7,7]
+                            sh_mul = np.prod(sh[1:]) #[147] 3*7*7
+                            temp = mp.view(sh[0], -1).norm(dim=1, keepdim=True).repeat(1, sh_mul).view(mp.shape)
+                            temp = torch.normal(0, self.nwp_rho * temp).to(mp.data.device)
+                        else: #b
+                            temp = torch.empty_like(mp, device=mp.data.device)
+                            temp.normal_(0, self.nwp_rho * (mp.view(-1).norm().item() + 1e-16))
+                        noise.append(temp)
+                        mp.data.add_(noise[-1])
+            else: #trigger = 0
+                weight = (1-self.nwp_alpha) * 2
+        data_batch['weight'] = weight
+        
         optimizer.zero_grad()
         log_vars = self(**data_batch)
+        
+        if self.nwp:
+            log_vars['nwp'] = self.nwp_trigger
+            if self.nwp_trigger: #1
+                with torch.no_grad():
+                    for mp, n in zip(self.get_model().parameters(), noise):
+                        mp.data.sub_(n)
+                del noise
+                self.nwp_trigger = 0
+            else: #0
+                self.nwp_trigger = 1
+        
         optimizer.step()
 
         log_vars.pop('loss', None)  # remove the unnecessary 'loss'
@@ -270,7 +315,8 @@ class SePiCoDark(UDADecorator):
         gt_seg = torch.cat(res_gt, dim=0).long()
         return (image, aux_image), gt_seg
 
-    def forward_train(self, img, img_metas, gt_semantic_seg, target_img, target_img_metas, target_gt_semantic_seg):
+    def forward_train(self, img, img_metas, gt_semantic_seg, target_img, 
+                      target_img_metas, target_gt_semantic_seg=None, weight=1):
         """Forward function for training.
 
         Args:
@@ -376,6 +422,12 @@ class SePiCoDark(UDADecorator):
 
         pseudo_weight = pseudo_weight * torch.ones(
             pseudo_label.shape, device=dev)
+        
+        if self.target_pseudo and self.local_iter <= self.target_pseudo_disable_iter:
+            # print('get pseudo_label', self.local_iter)
+            pseudo_label = target_gt_semantic_seg.squeeze(1) #[1,1,1024,1024]->[1,1024,1024]
+            pseudo_weight = torch.ones_like(pseudo_label, device=dev) * self.target_pseudo_weight #
+        log_vars['pseudo_weight'] = pseudo_weight.cpu().numpy().mean()
 
         if self.psweight_ignore_top > 0:
             # Don't trust pseudo-labels in regions with potential

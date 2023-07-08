@@ -18,5 +18,13 @@ uda = dict(
     color_jitter_strength=0.2,
     color_jitter_probability=0.2,
     debug_img_interval=1000,
+    nwp=False,
+    nwp_alpha=0.5,
+    nwp_rho=0.005,  # 
+    target_pseudo=True,
+    target_pseudo_disable_iter=1.0,  # when total_iter * dis_iter_ratio, stop target pseudo
+    target_pseudo_weight=0.9,  # 0.95 0.99
+    # target_pseudo_suffix="_pseudo_acdc_daformer_f1_new1"
+    target_pseudo_suffix='_pseudo_gta_daformer_f3_new4',
 )
 use_ddp_wrapper = True

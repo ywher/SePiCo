@@ -145,6 +145,10 @@ def main(args):
     model.init_weights()
 
     logger.info(model)
+    
+    if cfg.uda.target_pseudo:
+        cfg.data.train.target.ann_dir += cfg.uda.target_pseudo_suffix
+        logger.info('target pseudo label from: {}'.format(cfg.data.train.target.ann_dir))
 
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
