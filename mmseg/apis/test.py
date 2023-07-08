@@ -37,7 +37,8 @@ def single_gpu_test(model,
                     show=False,
                     out_dir=None,
                     efficient_test=False,
-                    opacity=0.5):
+                    opacity=0.5,
+                    save_logits=False):
     """Test with single GPU.
 
     Args:
@@ -63,7 +64,7 @@ def single_gpu_test(model,
         mmcv.mkdir_or_exist('.efficient_test')
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, **data)
+            result = model(return_loss=False, return_logits=save_logits, **data)
 
         if show or out_dir:
             img_tensor = data['img'][0]
@@ -89,7 +90,8 @@ def single_gpu_test(model,
                     palette=dataset.PALETTE,
                     show=show,
                     out_file=out_file,
-                    opacity=opacity)
+                    opacity=opacity,
+                    save_logits=save_logits)
 
         if isinstance(result, list):
             if efficient_test:
@@ -100,7 +102,7 @@ def single_gpu_test(model,
                 result = np2tmp(result, tmpdir='.efficient_test')
             results.append(result)
 
-        batch_size = len(result)
+        batch_size = len(result) if not save_logits else len(result[0])
         for _ in range(batch_size):
             prog_bar.update()
     return results
