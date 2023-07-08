@@ -1,6 +1,6 @@
 TEST_ROOT=$1
 CONFIG_FILE="${TEST_ROOT}/*${TEST_ROOT: -1}.json" #143, 
-CHECKPOINT_FILE="${TEST_ROOT}/latest.pth" #latest.pth
+CHECKPOINT_FILE="${TEST_ROOT}/iter_40000.pth" #latest.pth
 SHOW_DIR="${TEST_ROOT}/pred_train"
 echo 'Config File:' $CONFIG_FILE
 echo 'Checkpoint File:' $CHECKPOINT_FILE

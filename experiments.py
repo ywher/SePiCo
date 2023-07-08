@@ -266,7 +266,8 @@ def generate_experiment_cfgs(id):
         model = ('dlv2_proj', 'r101v1c')
         architecture, backbone = model
         datasets = [
-            ('gta', 'cityscapes'),
+            # ('gta', 'cityscapes'),
+            ('synthia', 'cityscapes'),
         ]
         # general
         uda = 'sepico'
