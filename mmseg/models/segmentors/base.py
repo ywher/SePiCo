@@ -111,9 +111,9 @@ class BaseSegmentor(BaseModule, metaclass=ABCMeta):
         if return_loss:
             return self.forward_train(img, img_metas, **kwargs)
         else:
-            return self.forward_test(img, img_metas, **kwargs)
+            return self.forward_test(img, img_metas, return_logits,**kwargs)
 
-    def train_step(self, data_batch, optimizer, return_logits, **kwargs):
+    def train_step(self, data_batch, optimizer, **kwargs):
         """The iteration step during training.
 
         This method defines an iteration step during training, except for the
