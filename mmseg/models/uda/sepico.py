@@ -242,6 +242,12 @@ class SePiCo(UDADecorator):
         image = torch.cat(res_img, dim=0).permute(0, 3, 1, 2).contiguous()
         gt_seg = torch.cat(res_gt, dim=0).long()
         return image, gt_seg
+    
+    def pseudo_train_enable(self):
+        if self.target_pseudo and self.local_iter <= self.target_pseudo_disable_iter:
+            return True
+        else:
+            return False
 
     def forward_train(self, img, img_metas, gt_semantic_seg, target_img, 
                       target_img_metas, target_gt_semantic_seg=None, weight=1):
@@ -302,11 +308,17 @@ class SePiCo(UDADecorator):
         ps_large_p = pseudo_prob.ge(self.pseudo_threshold).long() == 1
         ps_size = np.size(np.array(pseudo_label.cpu()))
         pseudo_weight = torch.sum(ps_large_p).item() / ps_size
+        
+        # target pseudo-label
+        pseudo_train_enable = self.pseudo_train_enable()
+        if pseudo_train_enable:
+            # print('get pseudo_label', self.local_iter)
+            pseudo_label = target_gt_semantic_seg.squeeze(1) #[1,1,1024,1024]->[1,1024,1024]
 
         # pseudo RandomCrop
         if self.pseudo_random_crop:
             weak_target_img, pseudo_label = self.random_crop(weak_target_img, pseudo_label, prod=self.prod)
-            if self.regen_pseudo:
+            if self.regen_pseudo and not pseudo_train_enable:
                 # Re-Generate pseudo-label
                 ema_target_logits = self.get_ema_model().encode_decode(weak_target_img, target_img_metas)
                 ema_target_softmax = torch.softmax(ema_target_logits.detach(), dim=1)
@@ -328,12 +340,12 @@ class SePiCo(UDADecorator):
                 target=pseudo_label.unsqueeze(1)
             )
 
-        pseudo_weight = pseudo_weight * torch.ones(
-            pseudo_label.shape, device=dev)
-        if self.target_pseudo and self.local_iter <= self.target_pseudo_disable_iter:
-            # print('get pseudo_label', self.local_iter)
-            pseudo_label = target_gt_semantic_seg.squeeze(1) #[1,1,1024,1024]->[1,1024,1024]
+        if pseudo_train_enable:
             pseudo_weight = torch.ones_like(pseudo_label, device=dev) * self.target_pseudo_weight #
+        else:
+            pseudo_weight = pseudo_weight * torch.ones(
+                pseudo_label.shape, device=dev)
+        
         log_vars['pseudo_weight'] = pseudo_weight.cpu().numpy().mean()
 
         if self.psweight_ignore_top > 0:

@@ -6,6 +6,7 @@ from .custom import CustomDataset
 from .dataset_wrappers import ConcatDataset, RepeatDataset
 from .dark_zurich import DarkZurichDataset
 from .gta import GTADataset
+from .synthia import SynthiaDataset
 from .uda_dataset import UDADataset
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     'CityscapesDataset',
     'DarkZurichDataset',
     'GTADataset',
+    'SynthiaDataset',
     'UDADataset',
 ]
